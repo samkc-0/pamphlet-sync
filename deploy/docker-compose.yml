@@ -18,29 +18,20 @@ services:
     build:
       context: ..
       dockerfile: Dockerfile
+    container_name: pamphlet-sync
     restart: unless-stopped
     env_file:
       - .env
     depends_on:
       postgres:
         condition: service_healthy
+    networks:
+      - default
+      - appnet
 
-  caddy:
-    image: caddy:2-alpine
-    restart: unless-stopped
-    ports:
-      - "80:80"
-      - "443:443"
-    environment:
-      SANDBOX_DOMAIN: ${SANDBOX_DOMAIN:?SANDBOX_DOMAIN is required}
-    volumes:
-      - ./Caddyfile:/etc/caddy/Caddyfile:ro
-      - caddy_data:/data
-      - caddy_config:/config
-    depends_on:
-      - api
+networks:
+  appnet:
+    external: true
 
 volumes:
   pamphlet_sync_pgdata:
-  caddy_data:
-  caddy_config:
