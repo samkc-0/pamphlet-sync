@@ -13,7 +13,8 @@ jobs:
         with:
           host: ${{ secrets.SANDBOX_SSH_HOST }}
           username: ${{ secrets.SANDBOX_SSH_USER }}
-          password: ${{ secrets.SANDBOX_SSH_PASSWORD }}
+          key: ${{ secrets.SANDBOX_SSH_KEY }}
+          passphrase: ${{ secrets.SANDBOX_SSH_KEY_PASSPHRASE }}
           script: |
             set -e
             cd ${{ secrets.SANDBOX_DEPLOY_PATH }}
