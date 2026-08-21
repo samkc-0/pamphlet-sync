@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"errors"
+	"fmt"
 	"net/http"
 	"time"
 
@@ -92,7 +93,26 @@ func (h *AuthHandler) GoogleCallback(c *gin.Context) {
 		return
 	}
 
-	c.Redirect(http.StatusFound, h.FrontendURL+"/?session="+token)
+	c.Data(http.StatusOK, "text/html; charset=utf-8", []byte(renderAuthPopupHTML(h.FrontendURL, token)))
+}
+
+// renderAuthPopupHTML is served in the OAuth popup window opened by the
+// frontend. It hands the session token back to the window that opened it
+// via postMessage and closes itself, so the main app tab never navigates.
+func renderAuthPopupHTML(frontendURL, token string) string {
+	return fmt.Sprintf(`<!doctype html>
+<html>
+<head><title>Signing in...</title></head>
+<body>
+<script>
+  if (window.opener) {
+    window.opener.postMessage({ type: "pamphlet-auth", token: %q }, %q);
+  }
+  window.close();
+</script>
+<p>Signed in. You can close this window.</p>
+</body>
+</html>`, token, frontendURL)
 }
 
 func (h *AuthHandler) upsertUser(googleUser *auth.GoogleUser) (models.User, error) {
