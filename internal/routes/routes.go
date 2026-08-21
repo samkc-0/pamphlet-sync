@@ -16,6 +16,7 @@ func Setup(r *gin.Engine, db *gorm.DB, cfg config.Config) {
 
 	health := handlers.NewHealthHandler(db)
 	r.GET("/healthz", health.Check)
+	r.GET("/version", handlers.Version)
 
 	authHandler := handlers.NewAuthHandler(db, cfg)
 	r.GET("/auth/google/login", authHandler.GoogleLogin)

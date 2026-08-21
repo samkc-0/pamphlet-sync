@@ -18,6 +18,9 @@ services:
     build:
       context: ..
       dockerfile: Dockerfile
+      args:
+        COMMIT_SHA: ${COMMIT_SHA:-unknown}
+        BUILD_TIME: ${BUILD_TIME:-unknown}
     container_name: pamphlet-sync
     restart: unless-stopped
     env_file:
