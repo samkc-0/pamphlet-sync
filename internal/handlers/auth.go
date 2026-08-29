@@ -3,6 +3,7 @@ package handlers
 import (
 	"errors"
 	"fmt"
+	"log"
 	"net/http"
 	"time"
 
@@ -40,6 +41,7 @@ func NewAuthHandler(db *gorm.DB, cfg config.Config) *AuthHandler {
 func (h *AuthHandler) GoogleLogin(c *gin.Context) {
 	state, err := auth.NewRandomToken()
 	if err != nil {
+		log.Printf("google login: generate state: %v", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to start login"})
 		return
 	}
@@ -66,18 +68,21 @@ func (h *AuthHandler) GoogleCallback(c *gin.Context) {
 
 	googleUser, err := auth.FetchGoogleUser(c.Request.Context(), h.OAuthConfig, code)
 	if err != nil {
+		log.Printf("google callback: fetch google user: %v", err)
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "google login failed"})
 		return
 	}
 
 	user, err := h.upsertUser(googleUser)
 	if err != nil {
+		log.Printf("google callback: upsert user %s: %v", googleUser.Email, err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to save user"})
 		return
 	}
 
 	token, err := auth.NewRandomToken()
 	if err != nil {
+		log.Printf("google callback: generate session token: %v", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to start session"})
 		return
 	}
@@ -89,9 +94,12 @@ func (h *AuthHandler) GoogleCallback(c *gin.Context) {
 		ExpiresAt: time.Now().Add(sessionTTL),
 	}
 	if err := h.DB.Create(&session).Error; err != nil {
+		log.Printf("google callback: save session for user %s: %v", user.ID, err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to save session"})
 		return
 	}
+
+	log.Printf("google callback: signed in %s", user.Email)
 
 	c.Data(http.StatusOK, "text/html; charset=utf-8", []byte(renderAuthPopupHTML(h.FrontendURL, token)))
 }
