@@ -24,16 +24,18 @@ const (
 )
 
 type AuthHandler struct {
-	DB          *gorm.DB
-	OAuthConfig *oauth2.Config
-	FrontendURL string
+	DB            *gorm.DB
+	OAuthConfig   *oauth2.Config
+	FrontendURL   string
+	SecureCookies bool
 }
 
 func NewAuthHandler(db *gorm.DB, cfg config.Config) *AuthHandler {
 	return &AuthHandler{
-		DB:          db,
-		OAuthConfig: auth.NewGoogleOAuthConfig(cfg),
-		FrontendURL: cfg.FrontendURL,
+		DB:            db,
+		OAuthConfig:   auth.NewGoogleOAuthConfig(cfg),
+		FrontendURL:   cfg.FrontendURL,
+		SecureCookies: cfg.GinMode == gin.ReleaseMode,
 	}
 }
 
@@ -46,7 +48,7 @@ func (h *AuthHandler) GoogleLogin(c *gin.Context) {
 		return
 	}
 
-	c.SetCookie(oauthStateCookie, state, 600, "/", "", false, true)
+	c.SetCookie(oauthStateCookie, state, 600, "/", "", h.SecureCookies, true)
 	c.Redirect(http.StatusFound, h.OAuthConfig.AuthCodeURL(state))
 }
 
@@ -58,7 +60,7 @@ func (h *AuthHandler) GoogleCallback(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid state"})
 		return
 	}
-	c.SetCookie(oauthStateCookie, "", -1, "/", "", false, true)
+	c.SetCookie(oauthStateCookie, "", -1, "/", "", h.SecureCookies, true)
 
 	code := c.Query("code")
 	if code == "" {
@@ -131,7 +133,9 @@ func (h *AuthHandler) upsertUser(googleUser *auth.GoogleUser) (models.User, erro
 		if user.Name != googleUser.Name || user.Email != googleUser.Email {
 			user.Name = googleUser.Name
 			user.Email = googleUser.Email
-			h.DB.Save(&user)
+			if err := h.DB.Save(&user).Error; err != nil {
+				log.Printf("upsert user: refresh profile for %s: %v", user.ID, err)
+			}
 		}
 		return user, nil
 	}
@@ -163,6 +167,10 @@ func (h *AuthHandler) Me(c *gin.Context) {
 // Logout deletes the current session so its token can no longer be used.
 func (h *AuthHandler) Logout(c *gin.Context) {
 	token := c.MustGet(middleware.CurrentTokenKey).(string)
-	h.DB.Delete(&models.Session{}, "token = ?", token)
+	if err := h.DB.Delete(&models.Session{}, "token = ?", token).Error; err != nil {
+		log.Printf("logout: delete session: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to log out"})
+		return
+	}
 	c.Status(http.StatusNoContent)
 }
