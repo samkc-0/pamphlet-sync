@@ -22,10 +22,21 @@ func Setup(r *gin.Engine, db *gorm.DB, cfg config.Config) {
 	r.GET("/auth/google/login", authHandler.GoogleLogin)
 	r.GET("/auth/google/callback", authHandler.GoogleCallback)
 
+	bookHandler := handlers.NewBookHandler(db)
+	progressHandler := handlers.NewProgressHandler(db)
+	pinnedWordHandler := handlers.NewPinnedWordHandler(db)
+
 	protected := r.Group("/")
 	protected.Use(middleware.RequireSession(db))
 	protected.GET("/me", authHandler.Me)
 	protected.POST("/auth/logout", authHandler.Logout)
+	protected.POST("/books", bookHandler.Create)
+	protected.GET("/books", bookHandler.List)
+	protected.GET("/books/:hash", bookHandler.Get)
+	protected.POST("/progress/:hash", progressHandler.Upsert)
+	protected.GET("/progress", progressHandler.List)
+	protected.POST("/pinned-words", pinnedWordHandler.Set)
+	protected.GET("/pinned-words", pinnedWordHandler.List)
 }
 
 func corsMiddleware(frontendURL string) gin.HandlerFunc {
