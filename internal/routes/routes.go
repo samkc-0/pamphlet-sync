@@ -18,9 +18,9 @@ func Setup(r *gin.Engine, db *gorm.DB, cfg config.Config) {
 	r.GET("/healthz", health.Check)
 	r.GET("/version", handlers.Version)
 
-	// Trimmed offline dictionary datasets (see pamphlet's
+	// Trimmed offline dictionary datasets (see the pamphlet-project repo's
 	// scripts/dictionary/). Public, read-only static files uploaded to the
-	// server directly (see DEPLOY.md) — never committed to either repo.
+	// server directly (see DEPLOY.md) — never committed to any repo.
 	r.Static("/dictionaries", cfg.DictionariesDir)
 
 	authHandler := handlers.NewAuthHandler(db, cfg)
