@@ -24,6 +24,11 @@ type Session struct {
 // chapters (see internal/handlers.BookChapter) rather than the original
 // EPUB file. ContentHash identifies the book across devices: the same
 // extracted text always hashes to the same value.
+//
+// Deleted marks a book removed on some device; the row is kept (not
+// hard-deleted) so UpdatedAt survives for last-write-wins conflict
+// resolution, and so other devices can positively confirm a deletion
+// happened rather than inferring it from the book's absence from List.
 type Book struct {
 	ID          string    `gorm:"primaryKey" json:"id"`
 	UserID      string    `gorm:"not null;uniqueIndex:idx_user_content_hash" json:"-"`
@@ -32,7 +37,9 @@ type Book struct {
 	Author      string    `json:"author"`
 	Language    string    `json:"language"`
 	Content     string    `json:"-"`
+	Deleted     bool      `json:"deleted"`
 	CreatedAt   time.Time `json:"createdAt"`
+	UpdatedAt   time.Time `json:"updatedAt"`
 }
 
 // ReadingProgress is a user's last-known reading position in a book,
@@ -57,6 +64,33 @@ type PinnedWord struct {
 	UpdatedAt    time.Time `json:"updatedAt"`
 }
 
+// UserSettings holds a user's global app preferences (not tied to any
+// particular book). One row per user.
+type UserSettings struct {
+	UserID                     string    `gorm:"primaryKey" json:"-"`
+	AnimationsEnabled          bool      `json:"animationsEnabled"`
+	AutoPlayWordAudio          bool      `json:"autoPlayWordAudio"`
+	IsDarkMode                 bool      `json:"isDarkMode"`
+	LastDictionaryLanguageCode string    `json:"lastDictionaryLanguageCode"`
+	LastSpanishVoiceRegion     string    `json:"lastSpanishVoiceRegion"`
+	UpdatedAt                  time.Time `json:"updatedAt"`
+}
+
+// BookMetadataOverride holds a user's display overrides for one book
+// (title/author/language corrections, reading font, voice choice),
+// identified by Book.ContentHash.
+type BookMetadataOverride struct {
+	UserID                 string    `gorm:"primaryKey" json:"-"`
+	ContentHash            string    `gorm:"primaryKey" json:"contentHash"`
+	Title                  string    `json:"title"`
+	Author                 string    `json:"author"`
+	LanguageCode           string    `json:"languageCode"`
+	DictionaryLanguageCode string    `json:"dictionaryLanguageCode"`
+	FontFamily             string    `json:"fontFamily"`
+	SpanishVoiceRegion     string    `json:"spanishVoiceRegion"`
+	UpdatedAt              time.Time `json:"updatedAt"`
+}
+
 // All returns every model that should be included in auto-migration.
 func All() []interface{} {
 	return []interface{}{
@@ -65,5 +99,7 @@ func All() []interface{} {
 		&Book{},
 		&ReadingProgress{},
 		&PinnedWord{},
+		&UserSettings{},
+		&BookMetadataOverride{},
 	}
 }

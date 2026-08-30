@@ -25,6 +25,8 @@ func Setup(r *gin.Engine, db *gorm.DB, cfg config.Config) {
 	bookHandler := handlers.NewBookHandler(db)
 	progressHandler := handlers.NewProgressHandler(db)
 	pinnedWordHandler := handlers.NewPinnedWordHandler(db)
+	settingsHandler := handlers.NewSettingsHandler(db)
+	bookMetadataHandler := handlers.NewBookMetadataHandler(db)
 
 	protected := r.Group("/")
 	protected.Use(middleware.RequireSession(db))
@@ -33,10 +35,15 @@ func Setup(r *gin.Engine, db *gorm.DB, cfg config.Config) {
 	protected.POST("/books", bookHandler.Create)
 	protected.GET("/books", bookHandler.List)
 	protected.GET("/books/:hash", bookHandler.Get)
+	protected.POST("/books/:hash/delete", bookHandler.Delete)
 	protected.POST("/progress/:hash", progressHandler.Upsert)
 	protected.GET("/progress", progressHandler.List)
 	protected.POST("/pinned-words", pinnedWordHandler.Set)
 	protected.GET("/pinned-words", pinnedWordHandler.List)
+	protected.POST("/settings", settingsHandler.Upsert)
+	protected.GET("/settings", settingsHandler.Get)
+	protected.POST("/book-metadata/:hash", bookMetadataHandler.Upsert)
+	protected.GET("/book-metadata", bookMetadataHandler.List)
 }
 
 func corsMiddleware(frontendURL string) gin.HandlerFunc {

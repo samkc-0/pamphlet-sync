@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/glebarez/sqlite"
@@ -200,5 +201,90 @@ func TestBookHandler_Get_NotFoundForUnknownHash(t *testing.T) {
 	invoke(c, h.Get)
 	if w.Code != http.StatusNotFound {
 		t.Errorf("expected 404, got %d", w.Code)
+	}
+}
+
+func TestBookHandler_Delete_MarksDeletedAndListReflectsIt(t *testing.T) {
+	db := newTestDB(t)
+	h := NewBookHandler(db)
+	user := testUser("u1")
+
+	c, w := newTestContext(user, http.MethodPost, "/books", createBookRequest{
+		ContentHash: "hash1",
+		Title:       "A Book",
+		Chapters:    []BookChapter{{ID: "ch1", Paragraphs: []string{"text"}}},
+	})
+	invoke(c, h.Create)
+	if w.Code != http.StatusNoContent {
+		t.Fatalf("seed create failed: %d", w.Code)
+	}
+
+	c, w = newTestContext(user, http.MethodPost, "/books/hash1/delete", deleteBookRequest{
+		UpdatedAt: time.Now(),
+	})
+	c.Params = gin.Params{{Key: "hash", Value: "hash1"}}
+	invoke(c, h.Delete)
+	if w.Code != http.StatusNoContent {
+		t.Fatalf("expected 204 deleting book, got %d: %s", w.Code, w.Body.String())
+	}
+
+	c, w = newTestContext(user, http.MethodGet, "/books", nil)
+	invoke(c, h.List)
+	var books []models.Book
+	json.Unmarshal(w.Body.Bytes(), &books)
+	if len(books) != 1 || !books[0].Deleted {
+		t.Fatalf("expected List to positively confirm the deletion, got %+v", books)
+	}
+
+	c, w = newTestContext(user, http.MethodGet, "/books/hash1", nil)
+	c.Params = gin.Params{{Key: "hash", Value: "hash1"}}
+	invoke(c, h.Get)
+	if w.Code != http.StatusNotFound {
+		t.Errorf("expected Get to reject a deleted book, got %d", w.Code)
+	}
+}
+
+func TestBookHandler_Delete_OlderDeleteIsIgnored(t *testing.T) {
+	db := newTestDB(t)
+	h := NewBookHandler(db)
+	user := testUser("u1")
+	now := time.Now()
+
+	c, w := newTestContext(user, http.MethodPost, "/books", createBookRequest{
+		ContentHash: "hash1",
+		Chapters:    []BookChapter{{ID: "ch1", Paragraphs: []string{"text"}}},
+	})
+	invoke(c, h.Create)
+	if w.Code != http.StatusNoContent {
+		t.Fatalf("seed create failed: %d", w.Code)
+	}
+
+	c, w = newTestContext(user, http.MethodPost, "/books/hash1/delete", deleteBookRequest{
+		UpdatedAt: now.Add(-time.Hour),
+	})
+	c.Params = gin.Params{{Key: "hash", Value: "hash1"}}
+	invoke(c, h.Delete)
+	if w.Code != http.StatusNoContent {
+		t.Fatalf("expected 204, got %d", w.Code)
+	}
+
+	var stored models.Book
+	db.Where("user_id = ? AND content_hash = ?", user.ID, "hash1").First(&stored)
+	if stored.Deleted {
+		t.Error("a delete request older than the book's creation should be ignored")
+	}
+}
+
+func TestBookHandler_Delete_NonexistentBookIsNoOp(t *testing.T) {
+	db := newTestDB(t)
+	h := NewBookHandler(db)
+
+	c, w := newTestContext(testUser("u1"), http.MethodPost, "/books/does-not-exist/delete", deleteBookRequest{
+		UpdatedAt: time.Now(),
+	})
+	c.Params = gin.Params{{Key: "hash", Value: "does-not-exist"}}
+	invoke(c, h.Delete)
+	if w.Code != http.StatusNoContent {
+		t.Errorf("expected 204 no-op for a nonexistent book, got %d", w.Code)
 	}
 }

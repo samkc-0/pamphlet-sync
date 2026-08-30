@@ -60,6 +60,7 @@ func (h *BookHandler) Create(c *gin.Context) {
 		return
 	}
 
+	now := time.Now()
 	book := models.Book{
 		ID:          uuid.NewString(),
 		UserID:      user.ID,
@@ -68,7 +69,8 @@ func (h *BookHandler) Create(c *gin.Context) {
 		Author:      req.Author,
 		Language:    req.Language,
 		Content:     string(content),
-		CreatedAt:   time.Now(),
+		CreatedAt:   now,
+		UpdatedAt:   now,
 	}
 
 	err = h.DB.Clauses(clause.OnConflict{
@@ -91,7 +93,7 @@ func (h *BookHandler) List(c *gin.Context) {
 
 	var books []models.Book
 	err := h.DB.
-		Select("id", "user_id", "content_hash", "title", "author", "language", "created_at").
+		Select("id", "user_id", "content_hash", "title", "author", "language", "deleted", "created_at", "updated_at").
 		Where("user_id = ?", user.ID).
 		Find(&books).Error
 	if err != nil {
@@ -125,6 +127,10 @@ func (h *BookHandler) Get(c *gin.Context) {
 		c.JSON(http.StatusNotFound, gin.H{"error": "book not found"})
 		return
 	}
+	if book.Deleted {
+		c.JSON(http.StatusNotFound, gin.H{"error": "book not found"})
+		return
+	}
 
 	var chapters []BookChapter
 	if err := json.Unmarshal([]byte(book.Content), &chapters); err != nil {
@@ -139,4 +145,51 @@ func (h *BookHandler) Get(c *gin.Context) {
 		Language: book.Language,
 		Chapters: chapters,
 	})
+}
+
+type deleteBookRequest struct {
+	UpdatedAt time.Time `json:"updatedAt" binding:"required"`
+}
+
+// Delete marks a book deleted for the current user, so other devices can
+// positively confirm the deletion via List rather than inferring it from
+// the book's absence. The row is kept (not hard-deleted) so UpdatedAt
+// survives for last-write-wins: a delete older than what's already
+// recorded is silently ignored.
+func (h *BookHandler) Delete(c *gin.Context) {
+	user := c.MustGet(middleware.CurrentUserKey).(models.User)
+	hash := c.Param("hash")
+
+	var req deleteBookRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request body"})
+		return
+	}
+
+	var book models.Book
+	err := h.DB.Where("user_id = ? AND content_hash = ?", user.ID, hash).First(&book).Error
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			c.Status(http.StatusNoContent)
+			return
+		}
+		log.Printf("delete book: query %s for user %s: %v", hash, user.ID, err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to delete book"})
+		return
+	}
+
+	if !req.UpdatedAt.After(book.UpdatedAt) {
+		c.Status(http.StatusNoContent)
+		return
+	}
+
+	book.Deleted = true
+	book.UpdatedAt = req.UpdatedAt
+	if err := h.DB.Save(&book).Error; err != nil {
+		log.Printf("delete book: update %s for user %s: %v", hash, user.ID, err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to delete book"})
+		return
+	}
+
+	c.Status(http.StatusNoContent)
 }
