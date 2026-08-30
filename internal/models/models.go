@@ -91,6 +91,22 @@ type BookMetadataOverride struct {
 	UpdatedAt              time.Time `json:"updatedAt"`
 }
 
+// NavigationState is which screen a user was looking at: the focused row
+// (a book's content hash, "library", or "settings"), which books were open
+// in the swipe grid, and which library-grid page was showing. One row per
+// user. A book's page *within* a book is deliberately not stored here -
+// that's ReadingProgress's job, since a ReaderPage.id is viewport-dependent
+// and meaningless on another device, while a library-grid page index is
+// portable as-is.
+type NavigationState struct {
+	UserID            string    `gorm:"primaryKey" json:"-"`
+	ActiveRowID       string    `json:"activeRowId"`
+	OpenContentHashes string    `json:"openContentHashes" gorm:"type:text"`
+	LibraryPageID     string    `json:"libraryPageId"`
+	SettingsPageID    string    `json:"settingsPageId"`
+	UpdatedAt         time.Time `json:"updatedAt"`
+}
+
 // All returns every model that should be included in auto-migration.
 func All() []interface{} {
 	return []interface{}{
@@ -101,5 +117,6 @@ func All() []interface{} {
 		&PinnedWord{},
 		&UserSettings{},
 		&BookMetadataOverride{},
+		&NavigationState{},
 	}
 }
