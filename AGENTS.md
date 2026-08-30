@@ -50,6 +50,32 @@ network (see `../DEPLOY.md`). The `api` service's `container_name:
 pamphlet-sync` in `deploy/docker-compose.yml` must stay exactly that — a
 separate Caddyfile, in another repo, hardcodes that hostname for routing.
 
+## Cross-device sync
+
+Signed-in users sync book content, reading progress, and pinned words
+across devices (`internal/handlers/books.go`, `progress.go`,
+`pinned_words.go`). **Whenever you add or change frontend state that should
+follow the user across devices, it needs a matching piece here** — a model
+(scoped per-user; composite-keyed on whatever the state is naturally keyed
+by, e.g. a book's content hash) and a protected POST/GET endpoint pair
+following the existing shape:
+
+- Writes are a *conditional* last-write-wins: `First` the existing row,
+  compare its `UpdatedAt` against the incoming client-supplied timestamp,
+  no-op if the incoming write isn't newer. Never a blind upsert (GORM's
+  `Save` silently updates zero rows if the composite key doesn't exist yet —
+  branch on `gorm.ErrRecordNotFound` explicitly instead).
+- A "deleted" or "unpinned" state is a row update (a boolean/flag field),
+  never a row delete — deleting the row destroys the timestamp the next
+  conflicting write needs to compare against.
+- `List` endpoints are scoped to the current user and never return a book's
+  `Content` (see `BookHandler.List`'s explicit `.Select()`).
+
+Conversely, don't add a sync endpoint here without also wiring the
+frontend's push/pull for it (see the matching note in `pamphlet`'s
+AGENTS.md) — a backend-only or frontend-only half of a sync feature is
+worse than not having it, since it silently doesn't do anything.
+
 ## Known debt
 
 - `AutoMigrate` runs on every boot instead of a real migration tool. Fine
