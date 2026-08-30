@@ -16,6 +16,7 @@ const releaseMode = "release"
 type Config struct {
 	Port               string
 	DatabaseURL        string
+	DictionariesDir    string
 	GinMode            string
 	FrontendURL        string
 	GoogleClientID     string
@@ -31,6 +32,7 @@ func Load() Config {
 	return Config{
 		Port:               getEnv("PORT", "8080"),
 		DatabaseURL:        getEnv("DATABASE_URL", "postgres://postgres:postgres@localhost:5433/pamphlet_sync?sslmode=disable"),
+		DictionariesDir:    getEnv("DICTIONARIES_DIR", "./dictionaries"),
 		GinMode:            getEnv("GIN_MODE", "debug"),
 		FrontendURL:        getEnv("FRONTEND_URL", "http://localhost:5173"),
 		GoogleClientID:     getEnv("GOOGLE_CLIENT_ID", ""),

@@ -27,6 +27,10 @@ go.work.sum
 # env file
 .env
 
+# Offline dictionary datasets, uploaded directly to the server — never
+# committed (see deploy/docker-compose.yml's bind mount and DEPLOY.md).
+deploy/dictionaries/
+
 # Editor/IDE
 # .idea/
 # .vscode/
