@@ -13,6 +13,29 @@ manually by the maintainer.
 runs the test suite and, if it passes, redeploys the live sandbox server
 over SSH. Don't push half-finished work to `dev`.
 
+For a feature that needs real isolation from whatever else is happening on
+`dev`, use a **git worktree**:
+
+```
+git worktree add ../feature-name -b feature-name
+```
+
+Checks `feature-name` out into a sibling directory
+(`pamphlet-project/feature-name`), with its own working tree. Go's module
+cache is shared machine-wide, so unlike the frontend there's no per-worktree
+install step — `go build`/`go test` just work. `deploy/.env` isn't
+committed, so a worktree used to deploy directly needs its own copy.
+
+Merge into `dev` from either worktree, then clean up:
+
+```
+git worktree remove ../feature-name
+git branch -d feature-name
+```
+
+`git worktree list` flags a worktree as `prunable` if its directory got
+deleted without `remove` first — clear those with `git worktree prune`.
+
 ## Before committing
 
 ```
