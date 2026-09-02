@@ -64,6 +64,18 @@ type PinnedWord struct {
 	UpdatedAt    time.Time `json:"updatedAt"`
 }
 
+// PinnedSentence tracks whether a user has pinned a sentence in a given
+// language, the same way PinnedWord tracks pinned words. Unpinning sets
+// Pinned to false rather than deleting the row, so the UpdatedAt timestamp
+// survives for last-write-wins conflict resolution.
+type PinnedSentence struct {
+	UserID       string    `gorm:"primaryKey" json:"-"`
+	LanguageCode string    `gorm:"primaryKey" json:"languageCode"`
+	Sentence     string    `gorm:"primaryKey" json:"sentence"`
+	Pinned       bool      `json:"pinned"`
+	UpdatedAt    time.Time `json:"updatedAt"`
+}
+
 // UserSettings holds a user's global app preferences (not tied to any
 // particular book). One row per user.
 type UserSettings struct {
@@ -115,6 +127,7 @@ func All() []interface{} {
 		&Book{},
 		&ReadingProgress{},
 		&PinnedWord{},
+		&PinnedSentence{},
 		&UserSettings{},
 		&BookMetadataOverride{},
 		&NavigationState{},
