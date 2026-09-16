@@ -34,6 +34,7 @@ func Setup(r *gin.Engine, db *gorm.DB, cfg config.Config) {
 	settingsHandler := handlers.NewSettingsHandler(db)
 	bookMetadataHandler := handlers.NewBookMetadataHandler(db)
 	navigationHandler := handlers.NewNavigationHandler(db)
+	notebookHandler := handlers.NewNotebookHandler(db)
 
 	protected := r.Group("/")
 	protected.Use(middleware.RequireSession(db))
@@ -55,6 +56,10 @@ func Setup(r *gin.Engine, db *gorm.DB, cfg config.Config) {
 	protected.GET("/book-metadata", bookMetadataHandler.List)
 	protected.POST("/navigation", navigationHandler.Upsert)
 	protected.GET("/navigation", navigationHandler.Get)
+	protected.POST("/notebooks", notebookHandler.Upsert)
+	protected.GET("/notebooks", notebookHandler.List)
+	protected.GET("/notebooks/:id", notebookHandler.Get)
+	protected.POST("/notebooks/:id/delete", notebookHandler.Delete)
 }
 
 func corsMiddleware(frontendURL string) gin.HandlerFunc {

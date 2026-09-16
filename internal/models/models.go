@@ -119,6 +119,24 @@ type NavigationState struct {
 	UpdatedAt         time.Time `json:"updatedAt"`
 }
 
+// Notebook is a user's freeform, editable notebook - unlike Book, its
+// Content is mutable (the user keeps writing in it), so it's identified by a
+// client-generated ID rather than a content hash, and syncs via the same
+// conditional last-write-wins mechanic as PinnedWord rather than Book's
+// upsert-if-absent. Deleted marks a notebook removed on some device; the row
+// is kept (not hard-deleted) for the same reason as Book.Deleted.
+type Notebook struct {
+	ID           string    `gorm:"primaryKey" json:"id"`
+	UserID       string    `gorm:"not null;index" json:"-"`
+	Title        string    `json:"title"`
+	Content      string    `json:"-"`
+	LanguageCode string    `json:"languageCode"`
+	FontFamily   string    `json:"fontFamily"`
+	Deleted      bool      `json:"deleted"`
+	CreatedAt    time.Time `json:"createdAt"`
+	UpdatedAt    time.Time `json:"updatedAt"`
+}
+
 // All returns every model that should be included in auto-migration.
 func All() []interface{} {
 	return []interface{}{
@@ -131,5 +149,6 @@ func All() []interface{} {
 		&UserSettings{},
 		&BookMetadataOverride{},
 		&NavigationState{},
+		&Notebook{},
 	}
 }
